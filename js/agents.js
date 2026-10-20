@@ -652,29 +652,25 @@ function route(text, ctx) {
     return found ? found.text : "";
   }
 
+  function sectionBeat(label) {
+    if (label === "Senses") return "sense";
+    if (label === "For the DM") return "note";
+    if (label === "Checks" || label === "Stat block") return "roll";
+    if (label === "People" || label === "Encounters" || label === "Actions" || label === "Traits" || label === "Reactions" || label === "Tactics" || label === "Equipment") return "act";
+    return "place";
+  }
+
   function formatSections(body, labels) {
     const blocks = [];
     labels.forEach((label) => {
       const value = sectionText(body, label);
       if (!value) return;
-      const prose = label === "Read-aloud" || label === "Senses" || label === "Summary";
-      const block = label === "Stat block" || label === "Traits" || label === "Actions" || label === "Reactions";
-      if (prose) {
-        value.split("\n").forEach((line) => {
-          if (line.trim()) blocks.push(line.trim());
-        });
-        return;
-      }
-      if (block) {
-        blocks.push(label);
-        value.split("\n").forEach((line) => {
-          if (line.trim()) blocks.push(line.trim());
-        });
-        return;
-      }
-      blocks.push("**" + label + "**: " + value.replace(/\s*\n\s*/g, " "));
+      const kind = sectionBeat(label);
+      value.split("\n").forEach((line) => {
+        if (line.trim()) blocks.push(beat(kind, line.trim()));
+      });
     });
-    return blocks.join("\n");
+    return blocks.join("\n\n");
   }
 
   function oneLiner(doc) {
@@ -739,37 +735,32 @@ function route(text, ctx) {
     const lines = [];
     const kind = personKind(fields);
     const article = kind && /^[aeiou]/i.test(kind) ? "an " : "a ";
-    lines.push(fields.Name + " is " + (kind ? article + kind : "recorded") + (fields.Location ? ", at " + fields.Location : "") + ".");
-    if (parts[0].trim()) lines.push(parts[0].trim());
+    lines.push(beat("act", fields.Name + " is " + (kind ? article + kind : "recorded") + (fields.Location ? ", at " + fields.Location : "") + "."));
+    if (parts[0].trim()) lines.push(beat("place", parts[0].trim()));
     const health = rules ? rules.healthOf(fields.HP, fields.HPMax) : { label: fields.Status || "Unset", percent: "" };
-    lines.push("They are " + health.label + (health.percent !== "" ? " (" + health.percent + "% of their hit points)" : "") + ", and " + (fields.Attitude || "Neutral") + " toward the party (" + (fields.AttitudeValue || "0") + ").");
-    if (fields.Alignment) lines.push("**Alignment**: " + fields.Alignment);
-    if (fields.Conditions) lines.push("**Conditions**: " + fields.Conditions);
-    if (fields.Motivation) lines.push(fields.Motivation);
-    if (fields.Voice) lines.push("**Voice**: " + fields.Voice);
-    if (parts[1]) lines.push("**For the DM**: " + parts[1].trim());
-    if (fields.History) lines.push("**History**: " + fields.History);
-    lines.push("**AC**: " + (fields.AC || "—"));
-    lines.push("**HP**: " + (fields.HP || "—") + (fields.HPMax ? "/" + fields.HPMax : ""));
+    lines.push(beat("emote", "They are " + health.label + (health.percent !== "" ? " (" + health.percent + "% of their hit points)" : "") + ", and " + (fields.Attitude || "Neutral") + " toward the party (" + (fields.AttitudeValue || "0") + ")."));
+    if (fields.Alignment) lines.push(beat("note", fields.Alignment + "."));
+    if (fields.Conditions) lines.push(beat("note", fields.Conditions + "."));
+    if (fields.Motivation) lines.push(beat("place", fields.Motivation));
+    if (fields.Voice) {
+      const quote = String(fields.Voice).match(/"([^"]+)"/);
+      lines.push(beat("say", quote ? "\"" + quote[1] + "\"" : fields.Voice));
+    }
+    if (parts[1]) lines.push(beat("note", parts[1].trim()));
+    if (fields.History) lines.push(beat("note", fields.History));
+    lines.push(beat("roll", "AC " + (fields.AC || "—") + "    HP " + (fields.HP || "—") + (fields.HPMax ? "/" + fields.HPMax : "")));
     if (rules) {
       const scores = rules.ABILITIES.map((ability) => {
         const score = fields[ability];
         if (!score) return "";
         return ability + " " + score + " (" + rules.abilityMod(score) + ")";
       }).filter(Boolean);
-      if (scores.length) lines.push("**Abilities**: " + scores.join(", "));
+      if (scores.length) lines.push(beat("roll", scores.join(", ")));
     }
-    if (fields.KeyStats) lines.push("**Combat**: " + fields.KeyStats);
-    if ((npc.equipment || []).length) {
-      lines.push("**Equipment**:");
-      npc.equipment.forEach((item) => lines.push("- " + item.item + (item.notes ? " — " + item.notes : "")));
-    }
-    const recent = (npc.interactions || []).slice(-3);
-    if (recent.length) {
-      lines.push("**Recent**:");
-      recent.forEach((item) => lines.push("- " + item.entry));
-    }
-    return lines.join("\n");
+    if (fields.KeyStats) lines.push(beat("act", fields.KeyStats));
+    (npc.equipment || []).forEach((item) => lines.push(beat("act", item.item + (item.notes ? " — " + item.notes : ""))));
+    (npc.interactions || []).slice(-3).forEach((item) => lines.push(beat("next", item.entry)));
+    return lines.filter(Boolean).join("\n\n");
   }
 
   function residents(ctx, title) {
@@ -786,12 +777,8 @@ function route(text, ctx) {
     if (doc.kind === "npc") return composeNpc(doc.npc);
     const order = SECTION_ORDER[doc.kind] || SECTION_ORDER.note;
     let body = formatSections(doc.entry.body, order);
-    if (doc.kind === "location") {
-      const names = residents(ctx, doc.title);
-      if (names.length) body += "\n**On the sheets**: " + names.join("; ");
-    }
     if (doc.kind === "rules" && ctx.campaign && ctx.campaign.HouseRules) {
-      body += "\n**House rules**: " + ctx.campaign.HouseRules;
+      body += "\n\n" + beat("note", ctx.campaign.HouseRules);
     }
     return body;
   }
@@ -836,16 +823,16 @@ function route(text, ctx) {
     if (!items.length) {
       return { title: titles[kind] || "On file", body: "Nothing of that kind is stored. On file: " + (inventory(ctx) || "no notes") + ".", sheet: "" };
     }
-    return { title: titles[kind] || "On file", body: items.map((doc) => "- **" + doc.title + "**: " + oneLiner(doc)).join("\n"), sheet: "" };
+    return { title: titles[kind] || "On file", body: items.map((doc) => beat("list", doc.title + "||" + oneLiner(doc))).join("\n\n"), sheet: "" };
   }
 
   function encounterReply(docs) {
     const lines = ["The notes do not build a new fight. These are the encounters already written down."];
     docs.filter((doc) => doc.kind === "location").forEach((doc) => {
       const text = sectionText(doc.entry.body, "Encounters");
-      if (text) lines.push("**" + doc.title + "**: " + text.replace(/\s*\n\s*/g, " "));
+      if (text) lines.push(beat("list", doc.title + "||" + text.replace(/\s*\n\s*/g, " ")));
     });
-    return { title: "Encounters on file", body: lines.join("\n"), sheet: "" };
+    return { title: "Encounters on file", body: lines.join("\n\n"), sheet: "" };
   }
 
   function rankedDocs(query, ctx) {
@@ -1028,7 +1015,7 @@ function route(text, ctx) {
     const verbs = tryVerbs(parseChecks(sectionText(place.entry.body, "Checks")).map((check) => check.skill));
     if (verbs.length) lines.push(beat("next", "You could " + verbs.join(", or ") + "."));
     if (/\b(rest|wait)\b/i.test(text)) lines.push(beat("next", "You could rest. Nothing heals until you say who, and by how much."));
-    return { title: place.title, body: lines.filter(Boolean).join("\n\n"), status: clockLine(ctx), sheet: "" };
+    return { title: place.title, body: lines.filter(Boolean).join("\n\n"), status: clockLine(ctx), sheet: "", stood: true };
   }
 
   function playCheck(place, text, ctx) {
@@ -1058,7 +1045,14 @@ function route(text, ctx) {
     lines.push(beat("roll", "You roll. d20 " + die + signed + " = " + total + " vs DC " + chosen.dc + "."));
     if (!bonus) lines.push(beat("next", "A bare roll. Name a modifier if you have one, such as " + chosen.skill + " +4."));
     lines.push(beat(success ? "place" : "act", success ? proseResult(chosen.success) : "Nothing comes of it. The place stays as you first saw it."));
-    return { title: place.title, body: lines.join("\n\n"), status: clockLine(ctx), sheet: "" };
+    return { title: place.title, body: lines.join("\n\n"), status: clockLine(ctx), sheet: "", stood: true };
+  }
+
+  function addressed(text, ctx) {
+    if (!/\b(talk|speak)\b/i.test(text)) return null;
+    if (/^(who|what|where|when|why|how|describe|list)\b/i.test(String(text || "").trim())) return null;
+    const people = matchNpcs(ctx.npcs, text);
+    return people.length ? people[0] : null;
   }
 
   function playTalk(npc, ctx) {
@@ -1117,8 +1111,22 @@ function route(text, ctx) {
     if (plan.write) return "Update " + plan.npcs.map((npc) => npc.fields.Name).join(", ");
     const played = playTurn(text, ctx);
     if (played) return played.title;
+    const person = addressed(text, ctx);
+    if (person) return person.fields.Name;
     if (asksWhere(text)) return whereReply(ctx).title;
     return composeReply(text, ctx).title;
+  }
+
+  function roomMessage(reply, stood) {
+    return {
+      kind: "reply",
+      title: reply.title,
+      kicker: "At the table",
+      body: reply.body,
+      sheet: reply.sheet || "",
+      status: reply.status || "",
+      stood: Boolean(stood),
+    };
   }
 
   async function ask(text, ctx, settings) {
@@ -1152,15 +1160,15 @@ function route(text, ctx) {
     }
 
     const played = playTurn(text, ctx);
-    if (played) return [{ kind: "reply", title: played.title, kicker: "At the table", body: played.body, sheet: played.sheet || "", status: played.status || "" }];
+    if (played) return [roomMessage(played, played.stood)];
 
-    if (asksWhere(text)) {
-      const here = whereReply(ctx);
-      return [{ kind: "reply", title: here.title, kicker: "At the table", body: here.body, sheet: "", status: here.status || "" }];
-    }
+    const person = addressed(text, ctx);
+    if (person) return [roomMessage(playTalk(person, ctx), false)];
+
+    if (asksWhere(text)) return [roomMessage(whereReply(ctx), false)];
 
     const reply = composeReply(text, ctx);
-    return [{ kind: "reply", title: reply.title, kicker: "From the notes", body: reply.body, sheet: reply.sheet || "" }];
+    return [roomMessage(Object.assign({ status: clockLine(ctx) }, reply), false)];
   }
 
   TL.agents = {
