@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#12110f">
   <title>Tablelight</title>
   <link rel="icon" href="favicon.svg">
-  <link rel="stylesheet" href="css/styles.css?v=9">
+  <link rel="stylesheet" href="css/styles.css?v=12">
 </head>
 <body>
   <div id="app">
@@ -20,7 +20,10 @@
           <textarea id="ask-input" rows="2" placeholder="Ask the campaign, or say what the party does."></textarea>
           <button class="btn primary" id="ask-send" type="submit">Ask</button>
         </form>
-        <p id="composer-hint" class="hint">Enter sends. Shift+Enter adds a line.</p>
+        <div class="composer-foot">
+          <button class="btn ghost" type="button" data-action="prompts">Prompts</button>
+          <p id="composer-hint" class="hint">Enter sends. Shift+Enter adds a line.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -29,10 +32,10 @@
   <div id="toasts"></div>
   <input id="file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
   <script src="vendor/xlsx.full.min.js"></script>
-  <script src="js/campaign.js?v=9"></script>
-  <script src="js/ruleset.js?v=9"></script>
-  <script src="js/workbook.js?v=9"></script>
-  <script src="js/agents.js?v=9"></script>
-  <script src="js/app.js?v=9"></script>
+  <script src="js/campaign.js?v=12"></script>
+  <script src="js/ruleset.js?v=12"></script>
+  <script src="js/workbook.js?v=12"></script>
+  <script src="js/agents.js?v=12"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>
