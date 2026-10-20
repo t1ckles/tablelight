@@ -157,8 +157,17 @@
     return state.npcs.find((npc) => npc.sheet === state.selectedSheet) || null;
   }
 
+  function partyHere() {
+    const places = new Set((state.lore || []).filter((entry) => /location/.test(String(entry.tags || ""))).map((entry) => entry.title));
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const message = state.messages[i];
+      if (message.kind === "reply" && message.kicker === "At the table" && places.has(message.title)) return message.title;
+    }
+    return "";
+  }
+
   function context() {
-    return { campaign: state.campaign, lore: state.lore, party: state.party, npcs: state.npcs };
+    return { campaign: state.campaign, lore: state.lore, party: state.party, npcs: state.npcs, here: partyHere() };
   }
 
   function flushNow() {
@@ -441,6 +450,69 @@
     state.messages.forEach((message) => thread.append(renderMessage(message)));
     if (state.busy) thread.append(el("div", { class: "pending" }, "Checking the notes…"));
     return thread;
+  }
+
+  function samplePerson() {
+    if (state.campaign && state.campaign.CampaignName === "The Drowned Bell") return "Edda Voss";
+    return (state.npcs[0] && state.npcs[0].fields.Name) || "someone on a sheet";
+  }
+
+  function samplePlace() {
+    if (state.campaign && state.campaign.CampaignName === "The Drowned Bell") return "the Bell Tower";
+    const place = (state.lore || []).find((entry) => /location/.test(String(entry.tags || "")));
+    return (place && place.title) || ((state.lore[0] && state.lore[0].title) || "the place");
+  }
+
+  function showPrompts() {
+    const person = samplePerson();
+    const place = samplePlace();
+    const drowned = state.campaign && state.campaign.CampaignName === "The Drowned Bell";
+    const groups = [
+      {
+        title: "Play",
+        note: "Say what the party does. The room is read back, and a secret stays hidden until a check earns it.",
+        items: [
+          "We enter " + place + ".",
+          "What room are we in?",
+          drowned ? "I investigate the clapper hook +5" : "I investigate here +5",
+          "We talk to " + person + ".",
+        ],
+      },
+      {
+        title: "Ask the notes",
+        note: "A question opens the workbook. Asking reads the notes, including a secret.",
+        items: [
+          "What other rooms are there?",
+          drowned ? "Who is the harbormaster?" : "Who is " + person + "?",
+          "Describe " + place + ".",
+          "What quests are open?",
+          drowned ? "Stat block for the Bell Warden." : "What monsters are written down?",
+        ],
+      },
+      {
+        title: "Change a sheet",
+        note: "Hit points, healing, and the rest wait until you press Apply.",
+        items: [
+          person + " takes 2 damage.",
+          person + " heals 2 damage.",
+          person + " heals all damage.",
+        ],
+      },
+    ];
+    const body = el("div", { class: "legend" }, [
+      el("p", { class: "help" }, "Click a line to put it in the box. Change the names if you need to, then Ask."),
+      groups.map((group) => el("section", { class: "legend-group" }, [
+        el("h3", {}, group.title),
+        el("p", { class: "help" }, group.note),
+        el("div", { class: "legend-prompts" }, group.items.map((text) => {
+          return el("button", { class: "legend-prompt", type: "button", "data-action": "use-prompt", "data-text": text }, text);
+        })),
+      ])),
+      el("p", { class: "help" }, "Each answer is filed on the session log. Clear only empties the conversation."),
+    ]);
+    openModal("How to ask", body, [{ label: "Close" }]);
+    const card = document.querySelector("#modal .modal-card");
+    if (card) card.classList.add("legend-card");
   }
 
   function examples() {
@@ -1226,11 +1298,16 @@
       render();
       return;
     }
-    if (action === "fill") {
+    if (action === "fill" || action === "use-prompt") {
       const input = document.getElementById("ask-input");
       input.value = button.dataset.text;
+      if (action === "use-prompt") closeModal();
       input.focus();
       paintHint();
+      return;
+    }
+    if (action === "prompts") {
+      showPrompts();
       return;
     }
     if (action === "use-sample") return askForNewWorkbook("sample");
@@ -1673,6 +1750,9 @@
         event.preventDefault();
         submitAsk();
       }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !document.getElementById("modal").hidden) closeModal();
     });
     document.getElementById("ask-input").addEventListener("input", paintHint);
     document.getElementById("file-input").addEventListener("change", async (event) => {
