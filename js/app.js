@@ -584,20 +584,13 @@
   }
 
   function renderReply(message) {
-    const playing = message.kicker === "At the table";
-    const card = el("article", { class: playing ? "room" : "card" });
+    const card = el("article", { class: "room" });
     const open = message.sheet ? el("button", { class: "btn", type: "button", "data-action": "open-npc", "data-sheet": message.sheet }, "Open sheet") : null;
-    if (playing) {
-      card.append(el("div", { class: "room-status" }, message.status || "At the table"));
-      card.append(el("h2", {}, message.title || "Here"));
-      renderRoom(card, message.body);
-      card.append(cardFoot(message, open));
-      return card;
-    }
-    const aside = message.sheet ? "Sheet " + message.sheet : "";
-    card.append(cardHead("lore", message.kicker || "From the notes", aside));
-    card.append(el("h2", {}, message.title || "From the notes"));
-    renderRich(card, message.body);
+    const status = message.status || (message.kicker && message.kicker !== "From the notes" ? message.kicker : "");
+    if (status) card.append(el("div", { class: "room-status" }, status));
+    card.append(el("h2", {}, message.title || "Here"));
+    if (/\[\[(?:place|sense|act|emote|say|roll|next|note|list)\]\]/.test(message.body || "")) renderRoom(card, message.body);
+    else renderRich(card, message.body);
     card.append(cardFoot(message, open));
     return card;
   }
