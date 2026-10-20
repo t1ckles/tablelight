@@ -494,7 +494,9 @@
       extra || null,
       el("div", { class: "row" }, [
         el("button", { class: "btn", type: "button", "data-action": "copy-message", "data-id": message.id }, "Copy"),
-        el("button", { class: "btn", type: "button", "data-action": "file-message", "data-id": message.id }, "File to session log"),
+        message.filed
+          ? el("button", { class: "btn", type: "button", disabled: true }, "Filed")
+          : el("button", { class: "btn", type: "button", "data-action": "file-message", "data-id": message.id }, "File to session log"),
       ]),
     ]);
   }
@@ -505,12 +507,20 @@
   }
 
   function renderReply(message) {
-    const card = el("article", { class: "card" });
+    const playing = message.kicker === "At the table";
+    const card = el("article", { class: playing ? "room" : "card" });
+    const open = message.sheet ? el("button", { class: "btn", type: "button", "data-action": "open-npc", "data-sheet": message.sheet }, "Open sheet") : null;
+    if (playing) {
+      card.append(el("div", { class: "room-status" }, message.status || "At the table"));
+      card.append(el("h2", {}, message.title || "Here"));
+      renderRoom(card, message.body);
+      card.append(cardFoot(message, open));
+      return card;
+    }
     const aside = message.sheet ? "Sheet " + message.sheet : "";
     card.append(cardHead("lore", message.kicker || "From the notes", aside));
     card.append(el("h2", {}, message.title || "From the notes"));
     renderRich(card, message.body);
-    const open = message.sheet ? el("button", { class: "btn", type: "button", "data-action": "open-npc", "data-sheet": message.sheet }, "Open sheet") : null;
     card.append(cardFoot(message, open));
     return card;
   }
@@ -587,6 +597,18 @@
     renderRich(card, message.body);
     card.append(cardFoot(message));
     return card;
+  }
+
+  function renderRoom(container, text) {
+    String(text || "").split(/\n\n/).forEach((block) => {
+      const match = block.trim().match(/^\[\[(place|sense|act|emote|say|roll|next)\]\]([\s\S]*)$/);
+      const kind = match ? match[1] : "place";
+      const body = (match ? match[2] : block).trim();
+      if (!body) return;
+      const line = el("p", { class: "room-" + kind });
+      appendInline(line, body);
+      container.append(line);
+    });
   }
 
   function renderRich(container, text) {
@@ -964,7 +986,7 @@
       ]),
       party.childNodes.length ? party : el("p", { class: "empty" }, "No adventurers yet."),
       el("h2", {}, "Recent session log"),
-      log.childNodes.length ? log : el("p", { class: "empty" }, "File an answer from the table to keep it on the _SessionLog sheet."),
+      log.childNodes.length ? log : el("p", { class: "empty" }, "Each answer on the table is written here, on the _SessionLog sheet."),
     ]);
   }
 
@@ -1018,7 +1040,10 @@
 
   function messagePlain(message) {
     if (!message) return "";
-    if (message.kind === "reply") return (message.title ? message.title + "\n" : "") + (message.body || "");
+    if (message.kind === "reply") {
+      const body = String(message.body || "").replace(/\[\[(?:place|sense|act|emote|say|roll|next)\]\]/g, "");
+      return (message.title ? message.title + "\n" : "") + body;
+    }
     if (message.kind === "npc") return TL.agents.npcBlock(message.npc);
     if (message.kind === "agent") return message.title + "\n" + message.body;
     if (message.kind === "lore") {
@@ -1037,6 +1062,28 @@
   function lastQuery() {
     const users = state.messages.filter((message) => message.kind === "user");
     return users.length ? users[users.length - 1].text : "";
+  }
+
+  function logLabel(message) {
+    if (message.kind === "proposal" && message.proposal) return message.proposal.name || "Sheet";
+    return message.title || message.kicker || message.kind;
+  }
+
+  function fileMessage(message) {
+    const kinds = { reply: 1, proposal: 1, lore: 1, npc: 1, party: 1, agent: 1, "draft-npc": 1 };
+    if (!message || message.filed || !state.wb || !kinds[message.kind]) return false;
+    const date = [state.campaign.InGameDate, state.campaign.InGameTime].filter(Boolean).join(", ");
+    state.log = TL.workbook.appendLog(state.wb, {
+      timestamp: new Date().toLocaleString(),
+      session: state.campaign.SessionNumber,
+      inGameDate: date,
+      agent: logLabel(message),
+      query: lastQuery(),
+      response: messagePlain(message).slice(0, 4000),
+    });
+    message.filed = true;
+    scheduleMirror();
+    return true;
   }
 
   function findMessage(id) {
@@ -1058,7 +1105,11 @@
     document.getElementById("ask-send").disabled = true;
     try {
       const produced = await TL.agents.ask(text, context(), state.settings);
-      produced.forEach((message) => state.messages.push(Object.assign({ id: uid(), at: Date.now() }, message)));
+      produced.forEach((message) => {
+        const stored = Object.assign({ id: uid(), at: Date.now() }, message);
+        state.messages.push(stored);
+        fileMessage(stored);
+      });
       const dispatch = produced.find((message) => message.kind === "dispatch");
       if (dispatch) announce(dispatch.text);
     } catch (error) {
@@ -1237,15 +1288,13 @@
     }
     if (action === "file-message") {
       const message = findMessage(button.dataset.id);
-      state.log = TL.workbook.appendLog(state.wb, {
-        timestamp: new Date().toLocaleString(),
-        session: state.campaign.SessionNumber,
-        inGameDate: state.campaign.InGameDate,
-        agent: message.title || message.kind,
-        query: lastQuery(),
-        response: messagePlain(message).slice(0, 4000),
-      });
-      scheduleMirror();
+      if (!message || message.filed) {
+        toast("Already on the session log.");
+        return;
+      }
+      fileMessage(message);
+      saveMessages();
+      render();
       toast("Filed on the session log sheet");
       return;
     }
