@@ -944,23 +944,60 @@ function route(text, ctx) {
     return sectionText(place.entry.body, "People");
   }
 
+  function clockLine(ctx) {
+    if (!ctx.campaign) return "";
+    return [ctx.campaign.InGameTime, ctx.campaign.InGameDate].filter(Boolean).join(" · ");
+  }
+
+  function tryVerbs(skills) {
+    const verbs = {
+      investigation: "investigate",
+      religion: "ask what this place means",
+      survival: "search for a way through",
+      perception: "look closer",
+      stealth: "move quietly",
+      insight: "watch who is here",
+      persuasion: "talk your way on",
+      athletics: "climb",
+      arcana: "study the working",
+    };
+    const lines = [];
+    skills.forEach((skill) => {
+      const verb = verbs[skill] || skill;
+      if (lines.indexOf(verb) < 0) lines.push(verb);
+    });
+    return lines.slice(0, 3);
+  }
+
+  function proseResult(sentence) {
+    let text = String(sentence || "")
+      .replace(/\b[A-Za-z]+\s+DC\s+\d+\s+/i, "")
+      .replace(/\ba?\s*DC\s+\d+\s+[A-Za-z]+\s+check\s+(with it,?\s+)?/i, "")
+      .replace(/^(shows|knows|tells|notices|finds|spots|catches|reads|recalls)\s+(that\s+)?/i, "");
+    text = text.trim().replace(/^[,:\s]+/, "");
+    if (!text) return sentence;
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+    if (!/[.!?]$/.test(text)) text += ".";
+    return text;
+  }
+
+  function beat(kind, text) {
+    const value = String(text || "").trim();
+    if (!value) return "";
+    return "[[" + kind + "]]" + value;
+  }
+
   function playScene(place, text, ctx) {
     const lines = [];
-    const aloud = sectionText(place.entry.body, "Read-aloud");
-    const senses = sectionText(place.entry.body, "Senses");
-    if (aloud) lines.push(aloud);
-    if (senses) lines.push("**Senses**: " + senses);
+    lines.push(beat("place", sectionText(place.entry.body, "Read-aloud")));
+    lines.push(beat("sense", sectionText(place.entry.body, "Senses")));
     const here = encounterLines(place.entry.body, text);
-    if (here.length) lines.push("**Already here**: " + here.join(" "));
-    const people = publicPeople(place);
-    if (people) lines.push("**People**: " + people);
-    const skills = parseChecks(sectionText(place.entry.body, "Checks")).map((check) => check.skill);
-    if (skills.length) lines.push("**Checks written here**: " + skills.join(", ") + ". Name one and a modifier, such as " + skills[0] + " +3.");
-    if (/\b(rest|wait)\b/i.test(text)) lines.push("A rest does not change hit points until you say who heals, and by how much.");
-    const clock = ctx.campaign ? [ctx.campaign.InGameTime, ctx.campaign.InGameDate].filter(Boolean).join(", ") : "";
-    if (clock) lines.push("**Clock**: " + clock);
-    lines.push("Secrets in the notes stay off the table until a check, or the fiction, reaches them.");
-    return { title: place.title, body: lines.join("\n"), sheet: "" };
+    if (here.length) lines.push(beat("act", here.join(" ")));
+    lines.push(beat("act", publicPeople(place)));
+    const verbs = tryVerbs(parseChecks(sectionText(place.entry.body, "Checks")).map((check) => check.skill));
+    if (verbs.length) lines.push(beat("next", "You could " + verbs.join(", or ") + "."));
+    if (/\b(rest|wait)\b/i.test(text)) lines.push(beat("next", "You could rest. Nothing heals until you say who, and by how much."));
+    return { title: place.title, body: lines.filter(Boolean).join("\n\n"), status: clockLine(ctx), sheet: "" };
   }
 
   function playCheck(place, text, ctx) {
@@ -971,7 +1008,7 @@ function route(text, ctx) {
     const matches = checks.filter((check) => asked.indexOf(check.skill) >= 0 || q.includes(check.skill));
     if (!matches.length) {
       const scene = playScene(place, text, ctx);
-      scene.body += "\nNo written check matches that wording.";
+      scene.body += "\n\n" + beat("next", "Nothing you try has a result written here.");
       return scene;
     }
     const words = wordTokens(text);
@@ -986,37 +1023,36 @@ function route(text, ctx) {
     const total = die + mod;
     const success = total >= chosen.dc;
     const lines = [];
-    const aloud = sectionText(place.entry.body, "Read-aloud");
-    if (aloud) lines.push(aloud);
     const signed = mod > 0 ? " + " + mod : mod < 0 ? " - " + Math.abs(mod) : "";
-    lines.push("**" + chosen.skill.charAt(0).toUpperCase() + chosen.skill.slice(1) + "**: d20 " + die + signed + " = " + total + " vs DC " + chosen.dc + ".");
-    if (!bonus) lines.push("No modifier was written, so the d20 stands alone. Add one by naming it, such as " + chosen.skill + " +4.");
-    lines.push(success ? chosen.success : "That does not come clear. The room stays as it first appeared.");
-    return { title: place.title, body: lines.join("\n"), sheet: "" };
+    lines.push(beat("roll", "You roll. d20 " + die + signed + " = " + total + " vs DC " + chosen.dc + "."));
+    if (!bonus) lines.push(beat("next", "A bare roll. Name a modifier if you have one, such as " + chosen.skill + " +4."));
+    lines.push(beat(success ? "place" : "act", success ? proseResult(chosen.success) : "Nothing comes of it. The place stays as you first saw it."));
+    return { title: place.title, body: lines.join("\n\n"), status: clockLine(ctx), sheet: "" };
   }
 
-  function playTalk(npc) {
+  function playTalk(npc, ctx) {
     const fields = npc.fields;
     const concept = String(fields.Concept || "").split(/\n?Secret:\s*/i)[0].trim();
+    const manner = { Hostile: "They want you gone.", Unfriendly: "They are not glad to see you.", Neutral: "They wait.", Friendly: "They seem glad you came.", Allied: "They treat you as one of their own." };
+    const quote = String(fields.Voice || "").match(/"([^"]+)"/);
     const lines = [];
-    lines.push(fields.Name + " is here" + (fields.Location ? ", at " + fields.Location : "") + ". They are " + (fields.Attitude || "Neutral") + " toward the party.");
-    if (concept) lines.push(concept);
-    if (fields.Voice) lines.push("**Voice**: " + fields.Voice);
-    lines.push("They do not volunteer a secret. Ask for a fact by name if it is already on the sheet.");
-    return { title: fields.Name, body: lines.join("\n"), sheet: npc.sheet };
+    lines.push(beat("act", (fields.Name || "They") + (fields.Location ? " is at " + fields.Location : " is here") + "."));
+    lines.push(beat("emote", manner[fields.Attitude] || manner.Neutral));
+    if (concept) lines.push(beat("place", splitSentences(concept)[0]));
+    if (quote) lines.push(beat("say", "\"" + quote[1] + "\""));
+    lines.push(beat("next", "They will not hand you a secret."));
+    return { title: fields.Name, body: lines.filter(Boolean).join("\n\n"), status: clockLine(ctx), sheet: npc.sheet };
   }
 
-  function playFight(monster, place) {
+  function playFight(monster, place, ctx) {
     const lines = [];
     const summary = sectionText(monster.entry.body, "Summary");
-    const actions = sectionText(monster.entry.body, "Actions");
-    const tactics = sectionText(monster.entry.body, "Tactics");
-    if (place) lines.push("At " + place.title + ".");
-    if (summary) lines.push(summary);
-    if (actions) lines.push("**Actions**: " + splitSentences(actions)[0]);
-    if (tactics) lines.push("**Tactics**: " + splitSentences(tactics)[0]);
-    lines.push("Say who takes damage, and how much, to update a sheet.");
-    return { title: monster.title, body: lines.join("\n"), sheet: "" };
+    const actions = splitSentences(sectionText(monster.entry.body, "Actions"));
+    if (place) lines.push(beat("place", "At " + place.title + "."));
+    if (summary) lines.push(beat("place", summary));
+    if (actions.length) lines.push(beat("act", actions[0]));
+    lines.push(beat("next", "Say who is hit, and for how much."));
+    return { title: monster.title, body: lines.filter(Boolean).join("\n\n"), status: clockLine(ctx), sheet: "" };
   }
 
   function playTurn(text, ctx) {
@@ -1025,16 +1061,18 @@ function route(text, ctx) {
     const place = bestOfKind(text, ctx, "location", 8);
     if (mode === "talk") {
       const people = matchNpcs(ctx.npcs, text);
-      if (people.length) return playTalk(people[0]);
+      if (people.length) return playTalk(people[0], ctx);
     }
     if (mode === "fight") {
       const monster = bestOfKind(text, ctx, "monster", 8);
-      if (monster) return playFight(monster, place);
+      if (monster) return playFight(monster, place, ctx);
     }
     if (!place) {
+      const places = library(ctx).filter((doc) => doc.kind === "location").map((doc) => doc.title);
       return {
-        title: "Not on the map",
-        body: "The party cannot go somewhere the notes do not name. On file: " + (inventory(ctx) || "no notes") + ".",
+        title: "You can't go there",
+        body: places.length ? "Places in this campaign: " + places.join(", ") + "." : "This campaign has no places written down.",
+        status: clockLine(ctx),
         sheet: "",
       };
     }
@@ -1082,7 +1120,7 @@ function route(text, ctx) {
     }
 
     const played = playTurn(text, ctx);
-    if (played) return [{ kind: "reply", title: played.title, kicker: "At the table", body: played.body, sheet: played.sheet || "" }];
+    if (played) return [{ kind: "reply", title: played.title, kicker: "At the table", body: played.body, sheet: played.sheet || "", status: played.status || "" }];
 
     const reply = composeReply(text, ctx);
     return [{ kind: "reply", title: reply.title, kicker: "From the notes", body: reply.body, sheet: reply.sheet || "" }];
