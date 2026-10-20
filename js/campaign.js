@@ -12,6 +12,7 @@
         SessionNumber: "1",
         InGameDate: "12th of the Grey Tide",
         InGameTime: "Afternoon",
+        StartPlace: "Saltwick",
         Boundaries: "Heroic fantasy suitable for teens and adults. No sexual content. Violence stays direct but not graphic. Do not depict harm to children.",
         HouseRules: "This screen recalls the adventure. It does not copy the rulebooks. Critical hits deal maximum damage plus a roll. Drinking a potion is a bonus action.",
       },
