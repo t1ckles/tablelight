@@ -451,6 +451,7 @@
         "What does the Pale Choir want?",
         "Stat block for the Bell Warden.",
         "What quests are open?",
+        "We enter the Bell Tower.",
         "Edda Voss took 6 damage.",
       ];
     }
