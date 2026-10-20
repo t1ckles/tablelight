@@ -709,7 +709,7 @@ function route(text, ctx) {
     if (/\b(people|npcs|everyone|who lives|who is here|whos here)\b/.test(q)) return "npc";
     if (/\bfactions?\b/.test(q)) return "faction";
     if (/\b(locations?|places?)\b/.test(q)) return "location";
-    if (/\b(rooms?|areas?)\b/.test(q) && /\b(what|which|list|other|else|any|all|there)\b/.test(q)) return "location";
+    if (!asksWhere(q) && /\b(rooms?|areas?)\b/.test(q) && /\b(what|which|list|other|else|any|all|there)\b/.test(q)) return "location";
     if (/\bwhere\b/.test(q) && /\b(else|other|go|next)\b/.test(q)) return "location";
     if (/\bmonsters?\b|\bcreatures?\b|\bstat blocks\b/.test(q)) return "monster";
     return "";
@@ -851,6 +851,28 @@ function route(text, ctx) {
   function rankedDocs(query, ctx) {
     const words = wordTokens(query);
     return library(ctx).map((doc) => ({ doc, score: scoreDoc(doc, query, words) })).filter((item) => item.score >= 4).sort((a, b) => b.score - a.score);
+  }
+
+  function asksWhere(text) {
+    const q = normalize(text);
+    if (/\bwhere are we\b|\bwhere am i\b|\bwheres the party\b/.test(q)) return true;
+    return /\b(room|place)\b/.test(q) && /\b(we|party|i)\b/.test(q) && /\b(in|at)\b/.test(q);
+  }
+
+  function whereReply(ctx) {
+    if (!ctx.here) {
+      return {
+        title: "Nowhere yet",
+        body: beat("next", "The party has not entered a place yet. Say where you go, or ask what rooms there are."),
+        status: clockLine(ctx),
+        sheet: "",
+      };
+    }
+    const doc = library(ctx).find((item) => item.kind === "location" && item.title === ctx.here);
+    if (!doc) {
+      return { title: ctx.here, body: beat("place", "The party is at " + ctx.here + "."), status: clockLine(ctx), sheet: "" };
+    }
+    return playScene(doc, "", ctx);
   }
 
   function composeReply(text, ctx) {
@@ -1088,6 +1110,7 @@ function route(text, ctx) {
     if (plan.write) return "Update " + plan.npcs.map((npc) => npc.fields.Name).join(", ");
     const played = playTurn(text, ctx);
     if (played) return played.title;
+    if (asksWhere(text)) return whereReply(ctx).title;
     return composeReply(text, ctx).title;
   }
 
@@ -1123,6 +1146,11 @@ function route(text, ctx) {
 
     const played = playTurn(text, ctx);
     if (played) return [{ kind: "reply", title: played.title, kicker: "At the table", body: played.body, sheet: played.sheet || "", status: played.status || "" }];
+
+    if (asksWhere(text)) {
+      const here = whereReply(ctx);
+      return [{ kind: "reply", title: here.title, kicker: "At the table", body: here.body, sheet: "", status: here.status || "" }];
+    }
 
     const reply = composeReply(text, ctx);
     return [{ kind: "reply", title: reply.title, kicker: "From the notes", body: reply.body, sheet: reply.sheet || "" }];
