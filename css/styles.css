@@ -173,6 +173,31 @@ button { cursor: pointer; }
 .rich-list { margin: 6px 0 8px; padding-left: 18px; }
 .card-foot { margin-top: 10px; }
 .card-foot .btn { color: var(--ink-on-paper); background: transparent; }
+.room {
+  background: #0c0b09;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px 14px;
+  max-width: 840px;
+}
+.room-status {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.room h2 { font-family: var(--serif); font-weight: 600; font-size: 28px; line-height: 1.15; margin: 8px 0 12px; }
+.room p { margin: 0 0 12px; }
+.room-place { font-family: var(--serif); font-size: 18px; line-height: 1.45; color: var(--ink); }
+.room-sense { font-family: var(--serif); font-style: italic; font-size: 16px; line-height: 1.45; color: var(--muted); }
+.room-act { font-family: var(--sans); font-size: 16px; line-height: 1.4; color: #f0e2c8; margin-left: 2px; padding-left: 12px; border-left: 2px solid rgba(226, 168, 90, 0.55); }
+.room-emote { font-family: var(--serif); font-style: italic; font-size: 17px; line-height: 1.4; color: #e7c98a; }
+.room-say { font-family: var(--serif); font-size: 18px; line-height: 1.4; color: var(--paper); padding-left: 14px; border-left: 3px solid var(--amber); }
+.room-roll { font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em; color: var(--amber); }
+.room-next { font-family: var(--sans); font-size: 14px; color: var(--faint); margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
+.room .card-foot .btn { color: var(--ink); }
 .note, .pending {
   border: 1px dashed var(--line);
   border-radius: 12px;
