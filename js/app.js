@@ -161,6 +161,11 @@
     const places = new Set((state.lore || []).filter((entry) => /location/.test(String(entry.tags || ""))).map((entry) => entry.title));
     for (let i = state.messages.length - 1; i >= 0; i--) {
       const message = state.messages[i];
+      if (message.kind === "reply" && message.stood && places.has(message.title)) return message.title;
+    }
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      const message = state.messages[i];
+      if (message.stood === false) continue;
       if (message.kind === "reply" && message.kicker === "At the table" && places.has(message.title)) return message.title;
     }
     return "";
@@ -673,12 +678,18 @@
 
   function renderRoom(container, text) {
     String(text || "").split(/\n\n/).forEach((block) => {
-      const match = block.trim().match(/^\[\[(place|sense|act|emote|say|roll|next)\]\]([\s\S]*)$/);
+      const match = block.trim().match(/^\[\[(place|sense|act|emote|say|roll|next|note|list)\]\]([\s\S]*)$/);
       const kind = match ? match[1] : "place";
       const body = (match ? match[2] : block).trim();
       if (!body) return;
       const line = el("p", { class: "room-" + kind });
-      appendInline(line, body);
+      if (kind === "list") {
+        const parts = body.split("||");
+        line.append(el("strong", {}, parts[0].trim()));
+        if (parts[1] && parts[1].trim()) line.append(document.createTextNode(" " + parts[1].trim()));
+      } else {
+        appendInline(line, body);
+      }
       container.append(line);
     });
   }
@@ -1114,7 +1125,7 @@
   function messagePlain(message) {
     if (!message) return "";
     if (message.kind === "reply") {
-      const body = String(message.body || "").replace(/\[\[(?:place|sense|act|emote|say|roll|next)\]\]/g, "");
+      const body = String(message.body || "").replace(/\[\[(?:place|sense|act|emote|say|roll|next|note|list)\]\]/g, "").replace(/\|\|/g, " ");
       return (message.title ? message.title + "\n" : "") + body;
     }
     if (message.kind === "npc") return TL.agents.npcBlock(message.npc);
