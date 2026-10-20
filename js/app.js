@@ -1029,6 +1029,7 @@
       el("label", {}, ["Party size", el("input", { "data-campaign": "PartySize", value: campaign.PartySize })]),
       el("label", {}, ["Session number", el("input", { "data-campaign": "SessionNumber", value: campaign.SessionNumber })]),
       el("label", { class: "wide" }, ["In-game date", el("input", { "data-campaign": "InGameDate", value: campaign.InGameDate, placeholder: "12th of the Grey Tide" })]),
+      el("label", { class: "wide" }, ["Starting place", el("input", { "data-campaign": "StartPlace", value: campaign.StartPlace || "", placeholder: "Where the party is standing when play opens" })]),
       el("div", { class: "wide" }, [
         el("span", {}, "In-game clock"),
         el("div", { class: "clock-times" }, TL.rules.TIMES.map((time) => {
