@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#12110f">
+  <title>Tablelight</title>
+  <link rel="icon" href="favicon.svg">
+  <link rel="stylesheet" href="css/styles.css?v=4">
+</head>
+<body>
+  <div id="app">
+    <aside id="nav"></aside>
+    <div id="workspace">
+      <header id="topbar"></header>
+      <main id="main">Opening the screen…</main>
+      <div id="composer-wrap">
+        <form id="composer" class="composer">
+          <textarea id="ask-input" rows="2" placeholder="Ask the campaign. A person, a place, a faction, a quest, or a monster."></textarea>
+          <button class="btn primary" id="ask-send" type="submit">Ask</button>
+        </form>
+        <p id="composer-hint" class="hint">Enter sends. Shift+Enter adds a line.</p>
+      </div>
+    </div>
+  </div>
+  <div id="live" class="sr" aria-live="polite"></div>
+  <div id="modal" hidden></div>
+  <div id="toasts"></div>
+  <input id="file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+  <script src="vendor/xlsx.full.min.js"></script>
+  <script src="js/campaign.js?v=4"></script>
+  <script src="js/ruleset.js?v=4"></script>
+  <script src="js/workbook.js?v=4"></script>
+  <script src="js/agents.js?v=4"></script>
+  <script src="js/app.js?v=4"></script>
+</body>
+</html>
