@@ -859,18 +859,25 @@ function route(text, ctx) {
     return /\b(room|place)\b/.test(q) && /\b(we|party|i)\b/.test(q) && /\b(in|at)\b/.test(q);
   }
 
+  function standingAt(ctx) {
+    const moved = ctx && ctx.here;
+    const start = ctx && ctx.campaign && ctx.campaign.StartPlace;
+    return String(moved || start || "").trim();
+  }
+
   function whereReply(ctx) {
-    if (!ctx.here) {
+    const title = standingAt(ctx);
+    if (!title) {
       return {
         title: "Nowhere yet",
-        body: beat("next", "The party has not entered a place yet. Say where you go, or ask what rooms there are."),
+        body: beat("next", "This campaign has no starting place. Name one on the Session page, or say where the party goes."),
         status: clockLine(ctx),
         sheet: "",
       };
     }
-    const doc = library(ctx).find((item) => item.kind === "location" && item.title === ctx.here);
+    const doc = library(ctx).find((item) => item.kind === "location" && item.title.toLowerCase() === title.toLowerCase());
     if (!doc) {
-      return { title: ctx.here, body: beat("place", "The party is at " + ctx.here + "."), status: clockLine(ctx), sheet: "" };
+      return { title: title, body: beat("place", "The party is at " + title + "."), status: clockLine(ctx), sheet: "" };
     }
     return playScene(doc, "", ctx);
   }
