@@ -36,7 +36,7 @@
   const WRITE_RE = /\b((?:took|takes?|taking|suffers?|suffered|loses?|lost|hit for)\s+(?:\d+|all)|dealt\s+\d+|\d+\s+(?:points?\s+of\s+)?(?:[a-z]+\s+)?damage|(?:heal(?:s|ed|ing)?|recover(?:s|ed|ing)?|restor(?:e|es|ed|ing)|regains?|regained)(?:\s+\d+|.{0,40}\b(?:all|remaining|the rest)\b)|fully healed|full heal|back to full|set\s+hp|hp\s+(?:to|is|now)|moved to|now (?:at|in)|location\s+is|gave\b|given\b|received\b|died\b|killed\b|befriended)\b/i;
 const ATTITUDE_WRITE_RE = /\battitude\s+(?:is|now|to|toward|towards|:)/i;
 const LOG_WRITE_RE = /^(?:update|record|log)\b/i;
-  const STOP = new Set(["what", "does", "this", "that", "with", "from", "your", "about", "where", "when", "who", "have", "they", "them", "their", "would", "could", "should", "into", "onto", "the", "and", "for", "are", "was", "were", "how", "why", "can", "you", "please", "main", "active"]);
+  const STOP = new Set(["what", "does", "this", "that", "with", "from", "your", "about", "where", "when", "who", "have", "they", "them", "their", "would", "could", "should", "into", "onto", "the", "and", "for", "are", "was", "were", "how", "why", "can", "you", "please", "main", "active", "other", "else", "there", "room", "rooms", "area", "areas"]);
 
   function normalize(value) {
     return String(value || "")
@@ -708,7 +708,9 @@ function route(text, ctx) {
     if (/\bquests?\b|\bhooks?\b|\bjobs?\b/.test(q)) return "quest";
     if (/\b(people|npcs|everyone|who lives|who is here|whos here)\b/.test(q)) return "npc";
     if (/\bfactions?\b/.test(q)) return "faction";
-    if (/\blocations?\b|\bplaces?\b/.test(q)) return "location";
+    if (/\b(locations?|places?)\b/.test(q)) return "location";
+    if (/\b(rooms?|areas?)\b/.test(q) && /\b(what|which|list|other|else|any|all|there)\b/.test(q)) return "location";
+    if (/\bwhere\b/.test(q) && /\b(else|other|go|next)\b/.test(q)) return "location";
     if (/\bmonsters?\b|\bcreatures?\b|\bstat blocks\b/.test(q)) return "monster";
     return "";
   }
