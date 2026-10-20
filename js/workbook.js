@@ -158,6 +158,7 @@
       SessionNumber: "1",
       InGameDate: "",
       InGameTime: "Morning",
+      StartPlace: "",
       Boundaries: "Heroic fantasy. No sexual content. Keep violence direct but not graphic.",
       HouseRules: "",
     };
